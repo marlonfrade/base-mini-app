@@ -25,7 +25,7 @@ export const minikitConfig = {
     splashImageUrl: `${ROOT_URL}blue-hero.png`,
     splashBackgroundColor: "#000000",
     homeUrl: ROOT_URL,
-    webhookUrl: `${ROOT_URL}/api/webhook`,
+    webhookUrl: `${ROOT_URL}api/webhook`,
     primaryCategory: "social",
     tags: ["marketing", "ads", "quickstart", "waitlist"],
     heroImageUrl: `${ROOT_URL}blue-hero.png`,
