@@ -1,0 +1,14 @@
+{
+  "accountAssociation": {
+    "signature": "",
+    "message": ""
+  },
+  "miniapp": {
+    "name": "Seu Mini App",
+    "icon": "https://base-mini-app-delta.vercel.app/icon.png",
+    "description": "Descrição do seu mini app"
+  },
+  "baseBuilder": {
+    "ownerAddress": "0x7F438a895fA3e7dB5D53Ec33c098F6152637BCa0"
+  }
+}

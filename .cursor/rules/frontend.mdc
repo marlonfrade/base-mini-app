@@ -1,0 +1,212 @@
+---
+alwaysApply: true
+---
+
+Título: Base Mini-App – Stylus Gas-less Pay (Payroll/Airdrop System)
+
+Função: Criar todo o projeto full-stack baseado no design do wireframe enviado.
+
+⸻
+
+✅ 🧠 Regras Globais para o Cursor
+
+O Cursor deve seguir estas regras em 100% das gerações:
+
+1. Stack obrigatória
+   • Frontend:
+   • Next.js 14/15 (App Router)
+   • React + TypeScript
+   • Shadcn UI (componentes padrão)
+   • Tailwind CSS
+   • Framer Motion (apenas para animações leves)
+   • MiniKit (Base Mini-app / OnchainKit)
+   • Viem/Wagmi para interações onchain
+   • Backend Onchain:
+   • Arbitrum Stylus com Rust (WASM)
+   • Contrato principal: batch_transfer
+   • Infra:
+   • Projeto criado com:
+
+npx create-onchain --mini payroll-app
+
+    •	CSV:
+    •	Parser obrigatório: papaparse ou csv-parse
+
+⸻
+
+✅ 2. Estrutura de Pastas que o Cursor deve criar
+
+/app
+/(routes)
+/dashboard
+/history
+/users
+/components
+UploadCSV.tsx
+PaymentTable.tsx
+PaymentForm.tsx
+UserModal.tsx
+Header.tsx
+Sidebar.tsx
+/lib
+parseCSV.ts
+formatters.ts
+validations.ts
+/contracts
+stylus-batch-pay/
+Cargo.toml
+src/lib.rs
+/onchain
+deploy.ts
+constants.ts
+/types
+payments.ts
+user.ts
+
+⸻
+
+✅ 3. Regras de UI — Baseadas no seu wireframe
+
+A UI precisa seguir estes componentes obrigatórios:
+
+✅ Tela principal – Dashboard
+• Campo para upload/import CSV (parte superior)
+• Campos individuais para adicionar entradas manualmente:
+• Nome
+• Wallet
+• Valor
+• Botão: “Cadastrar”
+• Tabela principal com colunas:
+• Nome
+• Endereço
+• Pagamento
+• Funções (Editar / Excluir)
+• Botão inferior grande: PAGAR
+• Sidebar estilo mini-app (como no seu desenho)
+• Layout responsivo 375px → desktop full
+
+⸻
+
+✅ Tela Users – Cadastro individual
+• Modal ou página separada (seguir instruções do wireframe)
+• Form obrigatório:
+• Nome
+• Wallet
+• Valor padrão
+• Ações: “Salvar” / “Cancelar”
+
+⸻
+
+✅ Tela History – Histórico de pagamentos
+• Listagem de execuções
+• Data
+• Hash da tx
+• Número de pagamentos
+• Custo de gás real
+• Botão: “Ver detalhes”
+
+⸻
+
+✅ 4. Regras Funcionais que o Cursor deve implementar
+
+CSV Import
+• Validar formato
+• Tratar erros
+• Exibir preview na tabela
+• Permitir edição linha a linha
+• Armazenar na state store (Zustand obrigatório)
+
+CRUD
+• Criar usuário
+• Editar usuário
+• Excluir usuário
+• Persistência local: Zustand
+• Persistência futura: API opcional
+
+Pagamento em lote
+• Montar arrays:
+
+recipients: string[]
+amounts: bigint[]
+
+    •	Serializar payload
+    •	Enviar para contrato Stylus via Viem
+    •	Exibir loader, estado e toast
+
+⸻
+
+✅ 5. Regras Onchain — Contrato Stylus (Rust)
+
+O Cursor deve gerar um contrato com:
+
+Função principal
+
+#[external]
+pub fn batch_transfer(
+&mut self,
+recipients: Vec<Address>,
+amounts: Vec<U256>
+)
+
+Regras da função:
+• Loop otimizado em WASM
+• Transferir token/ETH conforme amounts
+• Emitir evento: BatchTransferCompleted
+
+Deploy
+
+Gerar script:
+/onchain/deploy.ts
+
+⸻
+
+✅ 6. Regras de Qualidade
+• Código limpo e tipado
+• Padronização com eslint/prettier
+• Nenhum alerta TS permitido
+• Somente componentes desacoplados
+• Comentários obrigatórios nos principais blocos
+
+⸻
+
+✅ 7. Regras do Desenvolvedor AI (Cursor)
+• Sempre explicar a próxima alteração antes de executá-la
+• Gerar código funcional e completo
+• Nunca criar arquivos fora da estrutura definida
+• Perguntar antes se houver necessidade de gerar API ou banco
+• Priorizar a fidelidade ao wireframe
+• Após montar layout, gerar real content placeholders para demo
+
+⸻
+
+✅ 8. Injeção do Design (a partir da imagem)
+
+O Cursor deve usar o layout da imagem como guia:
+
+O que está explícito no design:
+• Sidebar à esquerda com lista de pagamentos
+• Tabela central com botões editar/excluir
+• Botão PAGAR centralizado e destacado
+• TODO list convertida em features:
+• Histórico de pagamentos
+• Menu hambúrguer
+• CRUD completo
+• Form de cadastro em modal
+• Import CSV Batch
+
+O Cursor deve implementar tudo isso exatamente como no wireframe.
+
+⸻
+
+✅ 9. Comportamentos adicionais obrigatórios
+• Toda tabela deve ser paginada (10 itens por página)
+• Campos com validação automática
+• Loading states com skeletons
+• Confirmação de exclusão com modal
+• Confirmação de pagamento com modal
+
+⸻
+
+✅ 10. Output inicial esperado do Cursor
+
+Assim que você colar este prompt no Cursor, o esperado é que ele: 1. Crie a estrutura inicial 2. Gere os primeiros componentes 3. Prepare o contrato Stylus 4. Configure MiniKit 5. Gere o layout base com Sidebar, Header e Dashboard

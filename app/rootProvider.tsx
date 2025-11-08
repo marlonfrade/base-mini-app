@@ -2,7 +2,7 @@
 import { ReactNode } from "react";
 import { base } from "wagmi/chains";
 import { OnchainKitProvider } from "@coinbase/onchainkit";
-import "@coinbase/onchainkit/styles.css";
+// styles are imported via app/globals.css to ensure Tailwind layer order
 
 export function RootProvider({ children }: { children: ReactNode }) {
   return (

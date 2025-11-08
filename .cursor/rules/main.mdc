@@ -1,0 +1,263 @@
+---
+alwaysApply: true
+---
+
+Cursor Rules — Stylus Gas-less Pay (Frontend Only)
+
+Você é um AI Engineer responsável por transformar o template do Mini App (Vercel + MiniKit) no wireframe final do projeto Stylus Gas-less Pay.
+Este repositório é EXCLUSIVAMENTE o frontend.
+Nenhum arquivo Rust/Stylus/Cargo/onchain pode ser criado.
+
+✅ 1. Regras Globais do Projeto
+Este repositório é apenas FRONTEND.
+
+Jamais gerar:
+
+Contratos Stylus
+
+Rust
+
+Cargo.toml
+
+Pasta /contracts
+
+Pasta /onchain
+
+Scripts de deploy
+
+batch_transfer
+
+Chainlink
+
+Lógica WASM
+
+Qualquer coisa “onchain”
+
+Toda lógica onchain está em outro repositório e é acessada via:
+
+✅ Backend REST (que fará transferências)
+✅ RPC (viem/wagmi apenas leitura)
+
+✅ 2. Objetivo da Transformação
+
+Transformar o template MiniKit em uma interface completa baseada no wireframe enviado pelo usuário, com os seguintes módulos:
+
+IMPORT CSV para pagamentos em lote
+
+CRUD de usuários (lista, criar, editar, excluir)
+
+Form de criação/edição de usuários em modal
+
+Batch CRUD da lista de pagamentos
+
+Menu hambúrguer (mobile) com editar/excluir
+
+Tela de histórico de pagamentos
+
+Botão PAGAR (que chama o backend)
+
+✅ 3. Estrutura de Pastas Obrigatória
+/app
+/dashboard
+/users
+/history
+/components
+UploadCSV.tsx
+PaymentTable.tsx
+PaymentRow.tsx
+Sidebar.tsx
+Header.tsx
+UserModal.tsx
+MobileMenu.tsx
+/lib
+api.ts
+store.ts // Zustand
+parseCSV.ts
+validators.ts
+/types
+payments.ts
+user.ts
+
+✅ 4. Integração com Backend (obrigatória)
+
+O front deve acessar estes endpoints via /lib/api.ts:
+
+GET /users/list
+POST /users/create
+PUT /users/update
+DELETE /users/delete
+
+POST /batch/estimate
+POST /batch/execute
+
+GET /history/list
+GET /history/{id}
+
+✅ O front apenas envia dados.
+✅ O backend calcula gás, valida addresses, executa pagamentos, grava histórico.
+✅ O contrato Stylus NÃO é chamado diretamente pelo front.
+
+✅ 5. Integração Onchain
+
+Usar viem somente para leitura, com:
+
+publicClient = createPublicClient({
+transport: http(process.env.NEXT_PUBLIC_RPC_URL)
+})
+
+Endereço e ABI serão adicionados manualmente depois, nunca gerar.
+
+✅ 6. Telas exigidas pelo wireframe
+✅ 1. Dashboard (/dashboard)
+
+Contém:
+
+Upload CSV
+
+Lista de pagamentos em tabela
+
+Botões Editar / Excluir
+
+Botão PAGAR
+
+Cards de resumo (opcional)
+
+Menu hambúrguer no mobile
+
+Sidebar no desktop
+
+✅ 2. Gerenciar Usuários (/users)
+
+Contém:
+
+Lista de usuários
+
+Botão “Criar Usuário”
+
+Modal para criar/editar usuário
+
+Ações Editar/Excluir
+
+✅ 3. Histórico (/history)
+
+Contém:
+
+Lista de pagamentos feitos
+
+Cada item abre um detalhe (/history/[id])
+
+Exibe transações, quantias, data, status, hash da tx etc.
+
+✅ 7. Componentes Obrigatórios
+✅ UploadCSV.tsx
+
+lê arquivo
+
+parseia com parseCSV.ts
+
+joga no Zustand store
+
+valida antes de enviar ao backend
+
+✅ PaymentTable.tsx / PaymentRow.tsx
+
+tabela completa com CRUD
+
+ações (Editar / Excluir)
+
+responsivo para mobile
+
+✅ UserModal.tsx
+
+formulário react-hook-form
+
+serve para criação e edição
+
+✅ Sidebar + Header + MobileMenu
+
+navegação
+
+responsividade
+
+menu hambúrguer funcional
+
+✅ 8. Estado Global (Zustand)
+
+Criar stores para:
+
+useUsersStore()
+
+usePaymentsStore()
+
+useHistoryStore()
+
+Cada store deve:
+
+✅ Manter loading/error
+✅ Carregar dados do backend
+✅ Permitir CRUD
+✅ Sincronizar com as telas
+
+✅ 9. Responsividade (wireframe)
+No mobile:
+
+Menus recolhidos (hambúrguer)
+
+Botões em modo ícone
+
+Pagamentos em cards
+
+No desktop:
+
+Sidebar fixa
+
+Tabelas amplas com 6+ colunas
+
+Botão PAGAR destacado no rodapé
+
+✅ 10. Fluxo Principal do Usuário
+✅ Upload CSV → Preenchimento automático da tabela
+✅ CRUD manual (edit/excluir/novo)
+✅ Estimativa → Mostrar modal de confirmação
+✅ PAGAR → Chamada ao backend
+✅ Registrar histórico → Exibir na tela
+✅ Detalhes do pagamento → mostrar infos enviadas pelo backend
+✅ 11. TO-DO incluídos automaticamente
+
+O sistema final deve suportar:
+
+✅ Histórico de pagamentos
+✅ Menu hambúrguer com editar/excluir/etc
+✅ Form de cadastrar user em outra tela ou modal
+✅ Import CSV com parse e CRUD
+✅ Tabela de pagamento com editar/excluir
+✅ Integração com backend para execuções batch
+✅ Apenas leituras via viem
+
+✅ 12. Regra Final
+
+Antes de gerar qualquer arquivo, o Cursor deve:
+
+✅ Criar um Plano Técnico Completo explicando exatamente como irá:
+
+Refatorar o template
+
+Criar cada página
+
+Criar cada componente
+
+Montar estado global
+
+Integrar API
+
+Reproduzir o wireframe
+
+Garantir funcionalidade mobile e desktop
+
+Garantir aderência ao projeto Stylus Gas-less Pay
+
+E então perguntar:
+
+“Deseja que eu inicie a implementação com base neste plano?”
+
+Somente depois de aprovado, gerar código.

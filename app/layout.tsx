@@ -4,6 +4,9 @@ import { SafeArea } from "@coinbase/onchainkit/minikit";
 import { minikitConfig } from "../minikit.config";
 import { RootProvider } from "./rootProvider";
 import "./globals.css";
+import Sidebar from "../components/Sidebar";
+import Header from "../components/Header";
+import { Toaster } from "../components/ui/sonner";
 
 export async function generateMetadata(): Promise<Metadata> {
   return {
@@ -44,7 +47,18 @@ export default function RootLayout({
     <RootProvider>
       <html lang="en">
         <body className={`${inter.variable} ${sourceCodePro.variable}`}>
-          <SafeArea>{children}</SafeArea>
+          <SafeArea>
+            <div className="grid min-h-dvh md:grid-cols-[240px_1fr]">
+              <div className="hidden border-r md:block">
+                <Sidebar />
+              </div>
+              <div className="grid grid-rows-[auto_1fr]">
+                <Header />
+                <main className="p-4">{children}</main>
+              </div>
+            </div>
+            <Toaster richColors position="bottom-center" />
+          </SafeArea>
         </body>
       </html>
     </RootProvider>
