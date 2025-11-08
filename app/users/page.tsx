@@ -25,10 +25,11 @@ import {
 import { UserPlus, Edit2, Trash2, Users as UsersIcon, Wallet } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
+import AuthGuard from "@/components/AuthGuard";
 
 const PAGE_SIZE = 10;
 
-export default function UsersPage() {
+function UsersContent() {
   const items = useUsersStore((s) => s.items);
   const remove = useUsersStore((s) => s.remove);
   const create = useUsersStore((s) => s.create);
@@ -274,5 +275,13 @@ export default function UsersPage() {
         </AlertDialogContent>
       </AlertDialog>
     </div>
+  );
+}
+
+export default function UsersPage() {
+  return (
+    <AuthGuard>
+      <UsersContent />
+    </AuthGuard>
   );
 }

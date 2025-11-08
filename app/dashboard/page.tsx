@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { usePaymentsStore, useHistoryStore } from "../../lib/store";
 import PaymentTable from "../../components/PaymentTable";
+import ContractStats from "../../components/ContractStats";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -16,25 +17,65 @@ import {
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 import Link from "next/link";
-import {
-  Pagination,
-  PaginationContent,
-  PaginationItem,
-  PaginationNext,
-  PaginationPrevious,
-} from "@/components/ui/pagination";
 import { TrendingUp, Users, Clock, Zap, ArrowUpRight, DollarSign } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import AuthGuard from "@/components/AuthGuard";
+import { useAccount, useWriteContract, useWaitForTransactionReceipt } from "wagmi";
+import { PAYMENT_CONTRACT_ADDRESS, PAYMENT_CONTRACT_ABI } from "@/lib/contractABI";
+import { parseEther } from "viem";
+import { cn } from "@/lib/utils";
+import { migrateLocalStorage } from "@/lib/migrateAddresses";
 
-export default function DashboardPage() {
+function DashboardContent() {
   const estimate = usePaymentsStore((s) => s.estimateBatch);
-  const execute = usePaymentsStore((s) => s.executeBatch);
   const rows = usePaymentsStore((s) => s.rows);
   const estimateData = usePaymentsStore((s) => s.estimate);
+  const clearRows = usePaymentsStore((s) => s.clear);
+  const loadMockData = usePaymentsStore((s) => s.loadMockData);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const historyItems = useHistoryStore((s) => s.items);
+  const addExecution = useHistoryStore((s) => s.addExecution);
   const [historyPage, setHistoryPage] = useState(1);
   const HISTORY_PAGE_SIZE = 5;
+  const [migrationDone, setMigrationDone] = useState(false);
+  
+  const { address, isConnected, chain } = useAccount();
+  const { writeContract, data: hash, isPending, error: writeError } = useWriteContract();
+  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });
+
+  useEffect(() => {
+    if (!migrationDone) {
+      const success = migrateLocalStorage();
+      setMigrationDone(true);
+      if (success) {
+        console.log("✅ Verificação de endereços concluída");
+      }
+    }
+  }, [migrationDone]);
+
+  useEffect(() => {
+    if (rows.length > 0) {
+      console.log("📊 Rows atuais:", rows.map(r => ({ name: r.name, amount: r.amount, wallet: r.wallet })));
+      estimate();
+    }
+  }, [rows, estimate]);
+
+  useEffect(() => {
+    if (rows.length > 0) {
+      const hasCorruptedData = rows.some(row => 
+        !row.wallet?.startsWith('0x') || 
+        row.wallet?.includes('e+') ||
+        row.wallet?.length !== 42
+      );
+      
+      if (hasCorruptedData) {
+        console.error("🚨 Dados corrompidos detectados! Limpando...");
+        clearRows();
+        localStorage.removeItem('payments-storage');
+        toast.error("Dados corrompidos detectados. Por favor, carregue os dados de teste novamente.");
+      }
+    }
+  }, [rows, clearRows]);
 
   const { pagedHistory, totalHistoryPages } = useMemo(() => {
     const start = (historyPage - 1) * HISTORY_PAGE_SIZE;
@@ -46,10 +87,68 @@ export default function DashboardPage() {
     return { pagedHistory: paged, totalHistoryPages: total };
   }, [historyItems, historyPage]);
 
+  useEffect(() => {
+    if (isSuccess && hash) {
+      toast.success(`Lote executado! Tx: ${hash}`);
+      
+      addExecution({
+        id: crypto.randomUUID(),
+        date: new Date().toISOString(),
+        txHash: hash,
+        count: rows.length,
+        status: "confirmed",
+        recipients: rows.map((r) => ({
+          name: r.name,
+          wallet: r.wallet,
+          amount: r.amount,
+        })),
+      });
+      
+      clearRows();
+      setConfirmOpen(false);
+    }
+  }, [isSuccess, hash, rows, addExecution, clearRows]);
+
+  useEffect(() => {
+    if (writeError) {
+      toast.error("Erro ao executar lote: " + writeError.message);
+      setConfirmOpen(false);
+    }
+  }, [writeError]);
+
   async function onPay() {
     if (rows.length === 0) return;
     estimate();
     setConfirmOpen(true);
+  }
+
+  async function executePayment() {
+    if (!isConnected) {
+      toast.error("Conecte sua carteira primeiro");
+      return;
+    }
+
+    try {
+      const wallets = rows.map(r => r.wallet as `0x${string}`);
+      const amounts = rows.map(r => parseEther(r.amount));
+      const totalValue = amounts.reduce((acc, val) => acc + val, BigInt(0));
+
+      if (chain?.id !== 421614) {
+        toast.warning("A carteira pedirá para trocar para Arbitrum Sepolia");
+      } else {
+        toast.info("Enviando transação...");
+      }
+
+      writeContract({
+        address: PAYMENT_CONTRACT_ADDRESS,
+        abi: PAYMENT_CONTRACT_ABI,
+        functionName: "sendFuncionarios",
+        args: [wallets, amounts, totalValue],
+      });
+    } catch (error: any) {
+      toast.error("Erro: " + error.message);
+      setConfirmOpen(false);
+    }
   }
 
   const stats = useMemo(() => {
@@ -67,25 +166,31 @@ export default function DashboardPage() {
   return (
     <div className="space-y-6 p-6">
       <div className="space-y-2">
-        <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
-        <p className="text-muted-foreground">
-          Visão geral dos seus pagamentos em lote na Base
-        </p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
+            <p className="text-muted-foreground">
+              Visão geral dos seus pagamentos em lote
+            </p>
+          </div>
+        </div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card className="border-l-4 border-l-blue-500">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Programados</CardTitle>
-            <Clock className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.totalScheduled}</div>
-            <p className="text-xs text-muted-foreground">
-              pagamentos aguardando
-            </p>
-          </CardContent>
-        </Card>
+      <div>
+        <h2 className="text-lg font-semibold mb-3">Dados Locais</h2>
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <Card className="border-l-4 border-l-blue-500">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Programados</CardTitle>
+              <Clock className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{stats.totalScheduled}</div>
+              <p className="text-xs text-muted-foreground">
+                pagamentos aguardando
+              </p>
+            </CardContent>
+          </Card>
 
         <Card className="border-l-4 border-l-green-500">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -125,6 +230,7 @@ export default function DashboardPage() {
             </p>
           </CardContent>
         </Card>
+        </div>
       </div>
 
       <Card>
@@ -136,12 +242,24 @@ export default function DashboardPage() {
                 Gerencie seus pagamentos pendentes
               </CardDescription>
             </div>
-            {estimateData && (
-              <div className="text-right">
-                <p className="text-sm font-medium">Total Estimado</p>
-                <p className="text-2xl font-bold">{estimateData.totalAmount} ETH</p>
-              </div>
-            )}
+            <div className="flex items-center gap-3">
+              {estimateData && (
+                <div className="text-right">
+                  <p className="text-sm font-medium">Total Estimado</p>
+                  <p className={cn(
+                    "text-2xl font-bold",
+                    parseFloat(estimateData.totalAmount) > 10 ? "text-red-500" : "text-green-600"
+                  )}>
+                    {estimateData.totalAmount} ETH
+                  </p>
+                  {parseFloat(estimateData.totalAmount) > 10 && (
+                    <p className="text-xs text-red-500 mt-1">
+                      ⚠️ Valor muito alto! Limpe e reimporte o CSV
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         </CardHeader>
         <CardContent>
@@ -232,22 +350,32 @@ export default function DashboardPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Confirmar pagamento em lote</AlertDialogTitle>
             <AlertDialogDescription>
-              Você está prestes a enviar {rows.length} pagamentos. Confirma?
+              Você está prestes a enviar {rows.length} pagamentos totalizando {estimateData?.totalAmount} ETH.
+              {!isConnected && " Conecte sua carteira para continuar."}
+              {isConnected && chain?.id !== 421614 && " A carteira pedirá para trocar para Arbitrum Sepolia."}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogCancel disabled={isPending || isConfirming}>
+              Cancelar
+            </AlertDialogCancel>
             <AlertDialogAction
-              onClick={async () => {
-                const res = await execute();
-                if (res) toast.success("Lote enviado! Tx: " + res.txHash);
-              }}
+              onClick={executePayment}
+              disabled={isPending || isConfirming || !isConnected}
             >
-              Enviar
+              {isPending ? "Aguardando aprovação..." : isConfirming ? "Confirmando..." : "Enviar"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
     </div>
+  );
+}
+
+export default function DashboardPage() {
+  return (
+    <AuthGuard>
+      <DashboardContent />
+    </AuthGuard>
   );
 }

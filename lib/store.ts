@@ -10,6 +10,39 @@ import type {
 import { estimateBatch, executeBatchOnchain } from "./api";
 import { validatePaymentRow } from "./validators";
 
+const MOCK_CSV_DATA: PaymentRow[] = [
+  {
+    id: crypto.randomUUID(),
+    name: "Alice Silva",
+    wallet: "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+    amount: "0.0001",
+  },
+  {
+    id: crypto.randomUUID(),
+    name: "Bruno Costa",
+    wallet: "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC",
+    amount: "0.0001",
+  },
+  {
+    id: crypto.randomUUID(),
+    name: "Carla Mendes",
+    wallet: "0x90F79bf6EB2c4f870365E785982E1f101E93b906",
+    amount: "0.0001",
+  },
+  {
+    id: crypto.randomUUID(),
+    name: "Daniel Oliveira",
+    wallet: "0x15d34AAf54267DB7D7c367839AAf71A00a2C6A65",
+    amount: "0.0001",
+  },
+  {
+    id: crypto.randomUUID(),
+    name: "Elena Santos",
+    wallet: "0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc",
+    amount: "0.0001",
+  },
+];
+
 type UsersState = {
   items: User[];
   create: (input: Pick<User, "name" | "wallet" | "defaultAmount">) => void;
@@ -56,9 +89,11 @@ type PaymentsState = {
   estimate?: BatchEstimate;
   setRows: (rows: PaymentRow[]) => void;
   addRow: (row: PaymentRow) => void;
+  addMultipleRows: (rows: PaymentRow[]) => void;
   updateRow: (id: string, partial: Partial<PaymentRow>) => void;
   removeRow: (id: string) => void;
   clear: () => void;
+  loadMockData: () => void;
   estimateBatch: () => void;
   executeBatch: () => Promise<{ batchId: string; txHash: string } | null>;
   executeSingle: (row: PaymentRow) => Promise<{ batchId: string; txHash: string } | null>;
@@ -70,10 +105,19 @@ export const usePaymentsStore = create<PaymentsState>()(
       rows: [],
       loading: false,
       setRows(rows) {
-        set({ rows });
+        console.log("🔧 Store setRows chamado com:", rows.length, "pagamentos");
+        set({ rows: [...rows] }, false, "setRows");
       },
       addRow(row) {
-        set({ rows: [row, ...get().rows] });
+        const newRows = [row, ...get().rows];
+        set({ rows: newRows }, false, "addRow");
+      },
+      addMultipleRows(newRows) {
+        const current = get().rows;
+        console.log("➕ Store addMultipleRows - Antes:", current.length, "Novos:", newRows.length);
+        const combined = [...current, ...newRows];
+        console.log("➕ Store addMultipleRows - Depois:", combined.length);
+        set({ rows: combined }, false, "addMultipleRows");
       },
       updateRow(id, partial) {
         set({
@@ -85,6 +129,14 @@ export const usePaymentsStore = create<PaymentsState>()(
       },
       clear() {
         set({ rows: [], estimate: undefined });
+      },
+      loadMockData() {
+        const mockData = MOCK_CSV_DATA.map(row => ({
+          ...row,
+          id: crypto.randomUUID(),
+        }));
+        console.log("📝 Carregando dados mock:", mockData);
+        set({ rows: mockData, estimate: undefined }, false, "loadMockData");
       },
       estimateBatch() {
         const validRows = get().rows.filter((r) => validatePaymentRow(r).valid);
@@ -147,7 +199,21 @@ export const usePaymentsStore = create<PaymentsState>()(
         }
       },
     })),
-    { name: "payments-storage" }
+    { 
+      name: "payments-storage",
+      version: 2,
+      migrate: (persistedState: any, version: number) => {
+        if (version < 2) {
+          console.log("🔄 Migrando para versão 2 - limpando dados antigos");
+          return {
+            rows: [],
+            loading: false,
+            estimate: undefined,
+          };
+        }
+        return persistedState;
+      },
+    }
   )
 );
 
@@ -172,6 +238,16 @@ export const useHistoryStore = create<HistoryState>()(
         set({ items: [] });
       },
     })),
-    { name: "history-storage" }
+    { 
+      name: "history-storage",
+      version: 2,
+      migrate: (persistedState: any, version: number) => {
+        if (version < 2) {
+          console.log("🔄 Migrando histórico para versão 2");
+          return { items: [] };
+        }
+        return persistedState;
+      },
+    }
   )
 );

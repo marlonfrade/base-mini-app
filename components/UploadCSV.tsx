@@ -11,8 +11,7 @@ import { cn } from "@/lib/utils";
 
 export default function UploadCSV() {
   const [summary, setSummary] = useState<string>("");
-  const addRows = usePaymentsStore((s) => s.setRows);
-  const existing = usePaymentsStore((s) => s.rows);
+  const addMultipleRows = usePaymentsStore((s) => s.addMultipleRows);
   const [previewRows, setPreviewRows] = useState<PaymentRow[] | null>(null);
   const [previewErrors, setPreviewErrors] = useState<string[]>([]);
   const [processing, setProcessing] = useState(false);
@@ -72,11 +71,18 @@ export default function UploadCSV() {
 
   function confirmImport() {
     if (!previewRows) return;
-    addRows([...existing, ...previewRows]);
-    toast.success(`${previewRows.length} pagamento${previewRows.length !== 1 ? 's' : ''} importado${previewRows.length !== 1 ? 's' : ''}`);
+    addMultipleRows(previewRows);
+    
+    setTimeout(() => {
+      const current = usePaymentsStore.getState().rows;
+      console.log("✅ Após importar, store tem:", current.length, "pagamentos");
+    }, 100);
+    
+    toast.success(`${previewRows.length} pagamento${previewRows.length !== 1 ? 's' : ''} importado${previewRows.length !== 1 ? 's' : ''} com sucesso!`);
     setPreviewRows(null);
     setPreviewErrors([]);
     setSummary("");
+    setProcessing(false);
     if (fileInputRef.current) fileInputRef.current.value = "";
   }
 
