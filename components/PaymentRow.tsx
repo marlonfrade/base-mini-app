@@ -6,6 +6,7 @@ import { validatePaymentRow } from "../lib/validators";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import { Edit2, Trash2, Zap, Check, X } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -35,102 +36,125 @@ export default function PaymentRow({ row }: { row: Row }) {
     }
     updateRow(row.id, draft);
     setEditing(false);
+    toast.success("Pagamento atualizado");
+  }
+
+  function onCancel() {
+    setDraft(row);
+    setEditing(false);
   }
 
   return (
-    <tr>
-      <td>
+    <tr className="group hover:bg-muted/30 transition-colors">
+      <td className="p-3">
         {editing ? (
           <Input
             value={draft.name}
             onChange={(e) => setDraft({ ...draft, name: e.target.value })}
+            className="h-8"
+            placeholder="Nome"
           />
         ) : (
-          row.name
+          <span className="font-medium">{row.name}</span>
         )}
       </td>
-      <td>
+      <td className="p-3">
         {editing ? (
           <Input
             value={draft.wallet}
             onChange={(e) => setDraft({ ...draft, wallet: e.target.value })}
+            className="h-8 font-mono text-xs"
+            placeholder="0x..."
           />
         ) : (
-          row.wallet
+          <span className="font-mono text-xs text-muted-foreground">{row.wallet}</span>
         )}
       </td>
-      <td>
+      <td className="p-3">
         {editing ? (
           <Input
             value={draft.amount}
             onChange={(e) => setDraft({ ...draft, amount: e.target.value })}
+            className="h-8"
+            placeholder="0.00"
           />
         ) : (
-          row.amount
+          <span className="font-semibold">{row.amount}</span>
         )}
       </td>
-      <td className="actions">
-        {!editing ? (
-          <>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setEditing(true)}
-            >
-              Editar
-            </Button>
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => setConfirmOpen(true)}
-            >
-              Antecipar
-            </Button>
-            <Button
-              variant="destructive"
-              size="sm"
-              onClick={() => removeRow(row.id)}
-            >
-              Excluir
-            </Button>
-            <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Antecipar este pagamento?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    Este envio será processado imediatamente como um lote unitário.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                  <AlertDialogAction
-                    onClick={async () => {
-                      const res = await executeSingle(row);
-                      if (res) toast.success("Pagamento antecipado. Lote: " + res.batchId);
-                    }}
-                  >
-                    Confirmar
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-          </>
-        ) : (
-          <>
-            <Button size="sm" onClick={onSave}>
-              Salvar
-            </Button>
-            <Button variant="ghost" size="sm" onClick={() => setEditing(false)}>
-              Cancelar
-            </Button>
-          </>
-        )}
+      <td className="p-3">
+        <div className="flex gap-1">
+          {editing ? (
+            <>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={onSave}
+                className="h-8"
+              >
+                <Check className="h-4 w-4 mr-1" />
+                Salvar
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={onCancel}
+                className="h-8"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setEditing(true)}
+                className="h-8 opacity-0 group-hover:opacity-100 transition-opacity"
+              >
+                <Edit2 className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setConfirmOpen(true)}
+                className="h-8 opacity-0 group-hover:opacity-100 transition-opacity"
+              >
+                <Zap className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => removeRow(row.id)}
+                className="h-8 text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </>
+          )}
+        </div>
+        <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Antecipar este pagamento?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Este envio será processado imediatamente como um lote unitário.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={async () => {
+                  const res = await executeSingle(row);
+                  if (res) toast.success("Pagamento enviado! Tx: " + res.txHash);
+                }}
+              >
+                Confirmar
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </td>
-      {errors.length > 0 && (
-        <td colSpan={4} className="text-error">
-          {errors.join(", ")}
-        </td>
-      )}
     </tr>
   );
 }

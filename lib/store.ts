@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { devtools } from "zustand/middleware";
+import { devtools, persist } from "zustand/middleware";
 import type { User } from "../types/user";
 import type {
   PaymentRow,
@@ -7,84 +7,48 @@ import type {
   HistoryItem,
   HistoryDetail,
 } from "../types/payments";
-import { api } from "./api";
+import { estimateBatch, executeBatchOnchain } from "./api";
 import { validatePaymentRow } from "./validators";
 
-// Users Store
 type UsersState = {
   items: User[];
-  loading: boolean;
-  error?: string;
-  load: () => Promise<void>;
-  create: (
-    input: Pick<User, "name" | "wallet" | "defaultAmount">
-  ) => Promise<void>;
-  update: (id: string, input: Partial<User>) => Promise<void>;
-  remove: (id: string) => Promise<void>;
+  create: (input: Pick<User, "name" | "wallet" | "defaultAmount">) => void;
+  update: (id: string, input: Partial<User>) => void;
+  remove: (id: string) => void;
 };
 
 export const useUsersStore = create<UsersState>()(
-  devtools((set, get) => ({
-    items: [],
-    loading: false,
-    async load() {
-      set({ loading: true, error: undefined });
-      try {
-        const items = await api.users.list();
-        set({ items });
-      } catch (e: unknown) {
-        const message =
-          e instanceof Error ? e.message : "Erro ao carregar usuários";
-        set({ error: message });
-      } finally {
-        set({ loading: false });
-      }
-    },
-    async create(input) {
-      const optimistic: User = {
-        id: `tmp-${crypto.randomUUID()}`,
-        ...input,
-      } as User;
-      set({ items: [optimistic, ...get().items] });
-      try {
-        const created = await api.users.create(input);
+  persist(
+    devtools((set, get) => ({
+      items: [],
+      create(input) {
+        const now = new Date().toISOString();
+        const user: User = {
+          id: crypto.randomUUID(),
+          name: input.name,
+          wallet: input.wallet,
+          defaultAmount: input.defaultAmount,
+          createdAt: now,
+          updatedAt: now,
+        };
+        set({ items: [user, ...get().items] });
+      },
+      update(id, input) {
+        const now = new Date().toISOString();
         set({
-          items: get().items.map((u) => (u.id === optimistic.id ? created : u)),
+          items: get().items.map((u) =>
+            u.id === id ? { ...u, ...input, updatedAt: now } : u
+          ),
         });
-      } catch (e: unknown) {
-        const message =
-          e instanceof Error ? e.message : "Falha ao criar usuário";
-        set({
-          items: get().items.filter((u) => u.id !== optimistic.id),
-          error: message,
-        });
-      }
-    },
-    async update(id, input) {
-      try {
-        const updated = await api.users.update({ id, ...input });
-        set({ items: get().items.map((u) => (u.id === id ? updated : u)) });
-      } catch (e: unknown) {
-        const message =
-          e instanceof Error ? e.message : "Falha ao atualizar usuário";
-        set({ error: message });
-      }
-    },
-    async remove(id) {
-      const prev = get().items;
-      set({ items: prev.filter((u) => u.id !== id) });
-      try {
-        await api.users.delete(id);
-      } catch (e: unknown) {
-        const message =
-          e instanceof Error ? e.message : "Falha ao remover usuário";
-        set({ items: prev, error: message });
-      }
-    },
-  }))
+      },
+      remove(id) {
+        set({ items: get().items.filter((u) => u.id !== id) });
+      },
+    })),
+    { name: "users-storage" }
+  )
 );
 
-// Payments Store
 type PaymentsState = {
   rows: PaymentRow[];
   loading: boolean;
@@ -95,125 +59,119 @@ type PaymentsState = {
   updateRow: (id: string, partial: Partial<PaymentRow>) => void;
   removeRow: (id: string) => void;
   clear: () => void;
-  estimateBatch: () => Promise<void>;
-  executeBatch: () => Promise<{ batchId: string } | null>;
-  executeSingle: (row: PaymentRow) => Promise<{ batchId: string } | null>;
+  estimateBatch: () => void;
+  executeBatch: () => Promise<{ batchId: string; txHash: string } | null>;
+  executeSingle: (row: PaymentRow) => Promise<{ batchId: string; txHash: string } | null>;
 };
 
 export const usePaymentsStore = create<PaymentsState>()(
-  devtools((set, get) => ({
-    rows: [],
-    loading: false,
-    setRows(rows) {
-      set({ rows });
-    },
-    addRow(row) {
-      set({ rows: [row, ...get().rows] });
-    },
-    updateRow(id, partial) {
-      set({
-        rows: get().rows.map((r) => (r.id === id ? { ...r, ...partial } : r)),
-      });
-    },
-    removeRow(id) {
-      set({ rows: get().rows.filter((r) => r.id !== id) });
-    },
-    clear() {
-      set({ rows: [], estimate: undefined });
-    },
-    async estimateBatch() {
-      set({ loading: true, error: undefined });
-      try {
-        const validRows = get().rows.filter((r) => validatePaymentRow(r).valid);
-        const estimate = await api.batch.estimate(validRows);
-        set({ estimate });
-      } catch (e: unknown) {
-        const message =
-          e instanceof Error ? e.message : "Falha ao estimar batch";
-        set({ error: message });
-      } finally {
-        set({ loading: false });
-      }
-    },
-    async executeBatch() {
-      set({ loading: true, error: undefined });
-      try {
-        const validRows = get().rows.filter((r) => validatePaymentRow(r).valid);
-        const res = await api.batch.execute(validRows, get().estimate);
+  persist(
+    devtools((set, get) => ({
+      rows: [],
+      loading: false,
+      setRows(rows) {
+        set({ rows });
+      },
+      addRow(row) {
+        set({ rows: [row, ...get().rows] });
+      },
+      updateRow(id, partial) {
+        set({
+          rows: get().rows.map((r) => (r.id === id ? { ...r, ...partial } : r)),
+        });
+      },
+      removeRow(id) {
+        set({ rows: get().rows.filter((r) => r.id !== id) });
+      },
+      clear() {
         set({ rows: [], estimate: undefined });
-        return { batchId: res.batchId };
-      } catch (e: unknown) {
-        const message =
-          e instanceof Error ? e.message : "Falha ao executar batch";
-        set({ error: message });
-        return null;
-      } finally {
-        set({ loading: false });
-      }
-    },
-    async executeSingle(row) {
-      set({ loading: true, error: undefined });
-      try {
-        // Execute only the provided row immediately
-        const res = await api.batch.execute([row], undefined);
-        // Remove the executed row from scheduled list
-        set({ rows: get().rows.filter((r) => r.id !== row.id) });
-        return { batchId: res.batchId };
-      } catch (e: unknown) {
-        const message =
-          e instanceof Error ? e.message : "Falha ao executar pagamento";
-        set({ error: message });
-        return null;
-      } finally {
-        set({ loading: false });
-      }
-    },
-  }))
+      },
+      estimateBatch() {
+        const validRows = get().rows.filter((r) => validatePaymentRow(r).valid);
+        const estimate = estimateBatch(validRows);
+        set({ estimate });
+      },
+      async executeBatch() {
+        set({ loading: true, error: undefined });
+        try {
+          const validRows = get().rows.filter((r) => validatePaymentRow(r).valid);
+          const res = await executeBatchOnchain(validRows, get().estimate);
+          const historyStore = useHistoryStore.getState();
+          historyStore.addExecution({
+            id: res.batchId,
+            date: new Date().toISOString(),
+            txHash: res.txHash,
+            count: validRows.length,
+            status: res.status,
+            recipients: validRows.map((r) => ({
+              name: r.name,
+              wallet: r.wallet,
+              amount: r.amount,
+            })),
+          });
+          
+          set({ rows: [], estimate: undefined });
+          return { batchId: res.batchId, txHash: res.txHash };
+        } catch (e: unknown) {
+          const message =
+            e instanceof Error ? e.message : "Falha ao executar batch";
+          set({ error: message });
+          return null;
+        } finally {
+          set({ loading: false });
+        }
+      },
+      async executeSingle(row) {
+        set({ loading: true, error: undefined });
+        try {
+          const res = await executeBatchOnchain([row], undefined);
+          const historyStore = useHistoryStore.getState();
+          historyStore.addExecution({
+            id: res.batchId,
+            date: new Date().toISOString(),
+            txHash: res.txHash,
+            count: 1,
+            status: res.status,
+            recipients: [{ name: row.name, wallet: row.wallet, amount: row.amount }],
+          });
+          
+          set({ rows: get().rows.filter((r) => r.id !== row.id) });
+          return { batchId: res.batchId, txHash: res.txHash };
+        } catch (e: unknown) {
+          const message =
+            e instanceof Error ? e.message : "Falha ao executar pagamento";
+          set({ error: message });
+          return null;
+        } finally {
+          set({ loading: false });
+        }
+      },
+    })),
+    { name: "payments-storage" }
+  )
 );
 
-// History Store
 type HistoryState = {
-  items: HistoryItem[];
-  detail?: HistoryDetail;
-  loading: boolean;
-  error?: string;
-  load: () => Promise<void>;
-  loadDetail: (id: string) => Promise<void>;
-  prepend: (item: HistoryItem) => void;
+  items: HistoryDetail[];
+  addExecution: (item: HistoryDetail) => void;
+  getDetail: (id: string) => HistoryDetail | undefined;
+  clear: () => void;
 };
 
 export const useHistoryStore = create<HistoryState>()(
-  devtools((set) => ({
-    items: [],
-    loading: false,
-    async load() {
-      set({ loading: true, error: undefined });
-      try {
-        const items = await api.history.list();
-        set({ items });
-      } catch (e: unknown) {
-        const message =
-          e instanceof Error ? e.message : "Erro ao carregar histórico";
-        set({ error: message });
-      } finally {
-        set({ loading: false });
-      }
-    },
-    async loadDetail(id) {
-      set({ loading: true, error: undefined });
-      try {
-        const detail = await api.history.detail(id);
-        set({ detail });
-      } catch (e: unknown) {
-        const message =
-          e instanceof Error ? e.message : "Erro ao carregar detalhe";
-        set({ error: message });
-      } finally {
-        set({ loading: false });
-      }
-    },
-    prepend(item) {
-      set((s) => ({ items: [item, ...s.items] }));
-    },
-  }))
+  persist(
+    devtools((set, get) => ({
+      items: [],
+      addExecution(item) {
+        set({ items: [item, ...get().items] });
+      },
+      getDetail(id) {
+        return get().items.find((i) => i.id === id);
+      },
+      clear() {
+        set({ items: [] });
+      },
+    })),
+    { name: "history-storage" }
+  )
 );
