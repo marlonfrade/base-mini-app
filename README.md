@@ -1,159 +1,246 @@
-# Waitlist Mini App Quickstart
+<div align="center">
+  <img src="./public/logo.png" alt="OnFlowChain" width="120" />
+  <h1>OnFlowChain — Stylus Gas-less Pay (Frontend)</h1>
+  <p>Pagamentos em lote para Web3 • Até 90% de economia em gás • UX pronta para produção</p>
+  <sub>Frontend Mini App (Next.js + MiniKit). Integra com backend Arbitrum Stylus (Rust/WASM) via REST.</sub>
+</div>
 
-This is a demo Mini App application built using OnchainKit and the Farcaster SDK. Build a waitlist sign-up mini app for your company that can be published to the Base app and Farcaster. 
+---
 
-> [!IMPORTANT]  
-> Before interacting with this demo, please review our [disclaimer](#disclaimer) — there are **no official tokens or apps** associated with Cubey, Base, or Coinbase.
+## 1) Visão Geral
 
-## Prerequisites
+OnFlowChain é uma interface Mini App para folha de pagamento/airdrop em lote focada em eficiência de gás e simplicidade operacional.  
+Este repositório contém apenas o frontend (Next.js + TypeScript + Tailwind + Shadcn UI + MiniKit + Zustand).
 
-Before getting started, make sure you have:
+- Backend (Rust/WASM no Arbitrum Stylus) e API REST: https://github.com/Alisson-tech/payment-arbitrum-styles
+- Objetivo: processar centenas de pagamentos em uma única execução com UX de aprovação simples (Upload CSV → Revisão → Confirmar pagamento).
 
-* Base app account
-* A [Farcaster](https://farcaster.xyz/) account
-* [Vercel](https://vercel.com/) account for hosting the application
-* [Coinbase Developer Platform](https://portal.cdp.coinbase.com/) Client API Key
+> Importante: a versão atual do frontend roda 100% client-side para demo (mock de execução/estimativa). A integração com o backend acima é direta e documentada abaixo.
 
-## Getting Started
+---
 
-### 1. Clone this repository 
+## 2) Contexto (Problema → Solução → Diferencial)
 
-```bash
-git clone https://github.com/base/demos.git
+- A dor: taxas de gás drenam tesourarias de DAOs, jogos e startups. Pagar 100 pessoas em Solidity = 100 transações e 100 taxas.
+- O problema: EVM tradicional não foi feito para pagamentos em lote com eficiência.
+- A solução: Arbitrum Stylus com contratos em Rust/WASM operando loops altamente eficientes, reduzindo custo em até 90%.  
+  A UI OnFlowChain empacota esse poder em um fluxo simples e auditável.
+
+Resumo executivo: processamos centenas de pagamentos em uma única execução, mantendo segurança, compatibilidade EVM e experiência amigável (CSV → Aprovar → Pagar).
+
+---
+
+## 3) Arquitetura de Alto Nível
+
+- Frontend: Next.js 15 (App Router), React 19, TypeScript, Tailwind CSS, Shadcn UI, MiniKit (Farcaster Mini Apps), Zustand (estado), Viem/Wagmi (somente leitura/estados de wallet), TanStack Query (pronto para API).
+- Backend: Arbitrum Stylus (Rust/WASM) + API REST para estimativa/execução/registro de histórico.  
+  Repositório: https://github.com/Alisson-tech/payment-arbitrum-styles
+- Integração: o frontend envia dados ao backend (sem chamadas diretas on-chain aqui). O backend executa, calcula gás e persiste histórico.
+
+---
+
+## 4) Funcionalidades do Frontend
+
+- Upload de CSV/XLSX com validação e preview
+  - Aceita `name`, `wallet`, `amount`.
+  - Valida headers e conteúdo; reporta erros de linha.
+- Tabela editável com CRUD (criar/editar/excluir) e paginação (10 itens/página).
+- Store global com Zustand: usuários, pagamentos e histórico, com persistência local.
+- Fluxo de pagamento em lote com modal de confirmação e feedback de status.
+- Histórico com lista (`/history`) e detalhe (`/history/[id]`).
+- UI responsiva: Sidebar (desktop), menu hambúrguer (mobile), skeletons e toasts.
+- MiniKit e manifesto para publicação como Mini App.
+
+> Execução/estimativa na demo: simuladas em `lib/api.ts` para rodar sem backend. Ao conectar o backend, os métodos passam a consumir a API REST real.
+
+---
+
+## 5) Stack Técnica
+
+- Next.js 15, React 19, TypeScript
+- Tailwind CSS + Shadcn UI
+- Zustand (persist/devtools), Zod (validações), TanStack Query
+- Viem + Wagmi (somente leitura / integração de carteira)
+- MiniKit (Farcaster Mini Apps) + Manifesto em `minikit.config.ts`
+- CSV/Planilhas: PapaParse + SheetJS (XLSX)
+
+---
+
+## 6) Estrutura de Pastas (principal)
+
+```
+app/
+  dashboard/           # Tabela e fluxo de pagamentos
+  users/               # Gestão de usuários
+  history/             # Histórico e detalhe por id
+  layout.tsx           # Shell (Sidebar/Header)
+  rootProvider.tsx     # Providers globais (tema, toasts, etc)
+
+components/
+  UploadCSV.tsx        # Upload e parse de arquivos
+  PaymentTable.tsx     # Tabela de pagamentos (paginações e ações)
+  PaymentRow.tsx       # Linha da tabela com validação
+  UserModal.tsx        # Modal de criar/editar usuário (react-hook-form)
+  Sidebar.tsx, Header.tsx, MobileMenu.tsx
+  ui/*                 # Shadcn UI
+
+lib/
+  api.ts               # Mock de estimate/execute (substituir por chamadas REST)
+  parseCSV.ts          # Parse de CSV/XLSX com validações e erros
+  validators.ts        # Regras (nome, wallet, amount, headers)
+  store.ts             # Zustand stores: users, payments, history
+  utils.ts, toast.ts, mockData.ts
+
+types/
+  payments.ts          # Tipos de PaymentRow, BatchEstimate, History*
+  user.ts              # Tipo User
 ```
 
-### 2. Install dependencies:
+---
+
+## 7) Estado Global (Zustand)
+
+- `useUsersStore()`: CRUD local de usuários (id, name, wallet, defaultAmount, timestamps).
+- `usePaymentsStore()`: linhas de pagamento, estimate local, execução simulada, loading/error.
+- `useHistoryStore()`: armazena execuções (id, txHash, status, recipients…) e busca detalhe.
+
+Persistência via `zustand/middleware/persist`, facilitando demo offline e re-hidratação.
+
+---
+
+## 8) CSV: Formato e Validações
+
+Headers obrigatórios (case-insensitive):
+
+```
+name,wallet,amount
+```
+
+Regras:
+- `name`: mínimo 2 caracteres.
+- `wallet`: `0x` address válido (checado com `viem/isAddress`).
+- `amount`: número positivo, aceita vírgula ou ponto como separador decimal.
+
+Arquivos aceitos: `.csv`, `.xlsx`, `.xls`.  
+Parsing: preferimos SheetJS (XLSX) para consistência; fallback para PapaParse em CSV.
+
+Erros por linha e por header são exibidos no preview antes de confirmar.
+
+---
+
+## 9) Integração com Backend (REST)
+
+Repositório do backend: https://github.com/Alisson-tech/payment-arbitrum-styles  
+Responsabilidades do backend:
+- Validar e normalizar payload
+- Estimar custo de gás
+- Executar batch no contrato Stylus (Rust/WASM)
+- Persistir histórico de execuções e detalhes
+
+Endpoints esperados (sugestão de contrato REST):
+- `GET /users/list`
+- `POST /users/create`
+- `PUT /users/update`
+- `DELETE /users/delete`
+- `POST /batch/estimate` → recebe `{ recipients: string[], amounts: string[] }`
+- `POST /batch/execute`  → retorna `{ batchId, txHash, status }`
+- `GET /history/list`
+- `GET /history/{id}`
+
+Como conectar no frontend:
+1) Substitua as funções mock em `lib/api.ts` por chamadas `fetch`/`react-query` aos endpoints acima.  
+2) Propague as respostas para as stores (`usePaymentsStore`, `useHistoryStore`) preservando os tipos em `types/`.
+
+---
+
+## 10) Configuração e Execução Local
+
+Pré-requisitos:
+- Node.js 20+
+- npm ou pnpm
+
+Instalação:
 
 ```bash
-cd demos/minikit/waitlist-mini-app-qs
 npm install
 ```
 
-### 3. Configure environment variables
-
-Create a `.env.local` file and add your environment variables:
+Variáveis de ambiente (`.env.local`):
 
 ```bash
-NEXT_PUBLIC_PROJECT_NAME="Your App Name"
-NEXT_PUBLIC_ONCHAINKIT_API_KEY=<Replace-WITH-YOUR-CDP-API-KEY>
-NEXT_PUBLIC_URL=
+NEXT_PUBLIC_PROJECT_NAME="OnFlowChain"
+NEXT_PUBLIC_ONCHAINKIT_API_KEY=<SUA_CDP_API_KEY>   # para features MiniKit/Farcaster
+NEXT_PUBLIC_URL=http://localhost:3000              # usado no manifesto
 ```
 
-### 4. Run locally:
+Executar em desenvolvimento:
 
 ```bash
 npm run dev
 ```
 
-## Customization
-
-### Update Manifest Configuration
-
-The `minikit.config.ts` file configures your manifest located at `app/.well-known/farcaster.json`.
-
-**Skip the `accountAssociation` object for now.**
-
-To personalize your app, change the `name`, `subtitle`, and `description` fields and add images to your `/public` folder. Then update their URLs in the file.
-
-## Deployment
-
-### 1. Deploy to Vercel
+Build e produção:
 
 ```bash
-vercel --prod
+npm run build
+npm start
 ```
-
-You should have a URL deployed to a domain similar to: `https://your-vercel-project-name.vercel.app/`
-
-### 2. Update environment variables
-
-Add your production URL to your local `.env` file:
-
-```bash
-NEXT_PUBLIC_PROJECT_NAME="Your App Name"
-NEXT_PUBLIC_ONCHAINKIT_API_KEY=<Replace-WITH-YOUR-CDP-API-KEY>
-NEXT_PUBLIC_URL=https://your-vercel-project-name.vercel.app/
-```
-
-### 3. Upload environment variables to Vercel
-
-Add environment variables to your production environment:
-
-```bash
-vercel env add NEXT_PUBLIC_PROJECT_NAME production
-vercel env add NEXT_PUBLIC_ONCHAINKIT_API_KEY production
-vercel env add NEXT_PUBLIC_URL production
-```
-
-## Account Association
-
-### 1. Sign Your Manifest
-
-1. Navigate to [Farcaster Manifest tool](https://farcaster.xyz/~/developers/mini-apps/manifest)
-2. Paste your domain in the form field (ex: your-vercel-project-name.vercel.app)
-3. Click the `Generate account association` button and follow the on-screen instructions for signing with your Farcaster wallet
-4. Copy the `accountAssociation` object
-
-### 2. Update Configuration
-
-Update your `minikit.config.ts` file to include the `accountAssociation` object:
-
-```ts
-export const minikitConfig = {
-    accountAssociation: {
-        "header": "your-header-here",
-        "payload": "your-payload-here",
-        "signature": "your-signature-here"
-    },
-    frame: {
-        // ... rest of your frame configuration
-    },
-}
-```
-
-### 3. Deploy Updates
-
-```bash
-vercel --prod
-```
-
-## Testing and Publishing
-
-### 1. Preview Your App
-
-Go to [base.dev/preview](https://base.dev/preview) to validate your app:
-
-1. Add your app URL to view the embeds and click the launch button to verify the app launches as expected
-2. Use the "Account association" tab to verify the association credentials were created correctly
-3. Use the "Metadata" tab to see the metadata added from the manifest and identify any missing fields
-
-### 2. Publish to Base App
-
-To publish your app, create a post in the Base app with your app's URL.
-
-## Learn More
-
-For detailed step-by-step instructions, see the [Create a Mini App tutorial](https://docs.base.org/docs/mini-apps/quickstart/create-new-miniapp/) in the Base documentation.
-
 
 ---
 
-## Disclaimer  
+## 11) MiniKit e Manifesto (Farcaster Mini App)
 
-This project is a **demo application** created by the **Base / Coinbase Developer Relations team** for **educational and demonstration purposes only**.  
+O manifesto é configurado em `minikit.config.ts` e serve o arquivo `/.well-known/farcaster.json`.
 
-**There is no token, cryptocurrency, or investment product associated with Cubey, Base, or Coinbase.**  
+- Atualize `name`, `subtitle`, `description`, `screenshotUrls`, `iconUrl`, `splashImageUrl`.
+- Ajuste `NEXT_PUBLIC_URL` para refletir o domínio público (Vercel).
+- Associe conta (accountAssociation) usando a ferramenta oficial Farcaster e cole os campos no config.
 
-Any social media pages, tokens, or applications claiming to be affiliated with, endorsed by, or officially connected to Cubey, Base, or Coinbase are **unauthorized and fraudulent**.  
-
-We do **not** endorse or support any third-party tokens, apps, or projects using the Cubey name or branding.  
-
-> [!WARNING]
-> Do **not** purchase, trade, or interact with any tokens or applications claiming affiliation with Coinbase, Base, or Cubey.  
-> Coinbase and Base will never issue a token or ask you to connect your wallet for this demo.  
-
-For official Base developer resources, please visit:  
-- [https://base.org](https://base.org)  
-- [https://docs.base.org](https://docs.base.org)  
+Publicação:
+1) Deploy em produção (ex.: Vercel).  
+2) Valide em `base.dev/preview`.  
+3) Publique seu link na Base App.
 
 ---
+
+## 12) Fluxo Principal do Usuário
+
+1. Upload CSV em `/dashboard` e revisão das linhas com erros destacados.  
+2. CRUD manual (criar/editar/excluir) diretamente na tabela.  
+3. Estimativa (mock/local na demo) e modal de confirmação.  
+4. Pagar (mock/local na demo) e feedback de status/txHash.  
+5. Ver histórico em `/history` e detalhe em `/history/[id]`.
+
+> Ao integrar o backend, a etapa 3/4 passam a utilizar `POST /batch/estimate` e `POST /batch/execute` com retorno real de txHash e custos.
+
+---
+
+## 13) Decisões de Engenharia e Qualidade
+
+- Componentização com Shadcn UI; acessibilidade e estados de loading (skeletons).  
+- Validações determinísticas na borda do cliente para UX imediata (antes do backend).  
+- Stores desacopladas e tipadas; sem side-effects ocultos.  
+- Tipos centralizados em `types/` para contratos estáveis com o backend.  
+- Paginação padrão 10 itens/página para escalabilidade visual.
+
+---
+
+## 14) Roadmap (pós-Hackaton)
+
+- Alternar entre mock/local e backend via flag/env.  
+- Integração completa dos endpoints de usuários e histórico.  
+- Suporte a múltiplas moedas/tokens e formatações regionais.  
+- Export de relatórios e reconciliação.  
+- Telemetria/observabilidade (ex.: OpenTelemetry).
+
+---
+
+## 15) Licença e Créditos
+
+Uso exclusivo para fins de demonstração de Hackaton.  
+Frontend baseado no template MiniKit (Base) e expandido para o caso de uso de pagamentos em lote com Arbitrum Stylus (via backend).
+
+—  
+Em caso de dúvidas técnicas ou validação de integração com o backend, consulte:  
+https://github.com/Alisson-tech/payment-arbitrum-styles
+
