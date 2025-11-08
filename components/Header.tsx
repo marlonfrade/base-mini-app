@@ -1,19 +1,37 @@
 "use client";
 import { useState } from "react";
 import { useTheme } from "next-themes";
+import { useAccount, useDisconnect } from "wagmi";
 import { Button } from "@/components/ui/button";
-import { Menu, Moon, Sun, Laptop, Wallet } from "lucide-react";
+import { Menu, Moon, Sun, Laptop, Wallet, LogOut, Copy, ExternalLink } from "lucide-react";
 import MobileMenu from "./MobileMenu";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { toast } from "sonner";
+import Link from "next/link";
 
 export default function Header() {
   const [open, setOpen] = useState(false);
   const { setTheme, theme } = useTheme();
+  const { address, isConnected } = useAccount();
+  const { disconnect } = useDisconnect();
+
+  const copyAddress = () => {
+    if (address) {
+      navigator.clipboard.writeText(address);
+      toast.success("Endereço copiado!");
+    }
+  };
+
+  const handleDisconnect = () => {
+    disconnect();
+    toast.info("Carteira desconectada");
+  };
 
   return (
     <header className="sticky top-0 z-50 border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -42,9 +60,54 @@ export default function Header() {
           </div>
         </div>
 
-        {/* Actions */}
         <div className="flex items-center gap-2">
-          {/* Theme toggle
+          {isConnected && address ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="gap-2 hidden sm:flex">
+                  <Wallet className="h-4 w-4" />
+                  <code className="text-xs">
+                    {address.slice(0, 6)}...{address.slice(-4)}
+                  </code>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <div className="px-2 py-1.5">
+                  <p className="text-xs text-muted-foreground mb-1">Endereço da carteira</p>
+                  <code className="text-xs bg-muted px-2 py-1 rounded block">
+                    {address.slice(0, 10)}...{address.slice(-8)}
+                  </code>
+                </div>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={copyAddress} className="gap-2">
+                  <Copy className="h-4 w-4" />
+                  Copiar endereço
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild className="gap-2">
+                  <a
+                    href={`https://basescan.org/address/${address}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <ExternalLink className="h-4 w-4" />
+                    Ver no BaseScan
+                  </a>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={handleDisconnect} className="gap-2 text-destructive">
+                  <LogOut className="h-4 w-4" />
+                  Desconectar
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : (
+            <Button asChild variant="outline" size="sm" className="gap-2 hidden sm:flex">
+              <Link href="/login">
+                <Wallet className="h-4 w-4" />
+                Conectar
+              </Link>
+            </Button>
+          )}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="icon" className="h-9 w-9">
@@ -68,7 +131,6 @@ export default function Header() {
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-                     */}
         </div>
 
         <MobileMenu open={open} onOpenChange={setOpen} />

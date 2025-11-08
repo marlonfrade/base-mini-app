@@ -2,12 +2,12 @@ import * as XLSX from "xlsx";
 import type { ParseResult as PapaParseResult, ParseError } from "papaparse";
 import type { PaymentRow } from "../types/payments";
 import { validateCSVHeaders } from "./validators";
+import { toChecksumAddress } from "./utils";
 
 type ParseResult = { rows: PaymentRow[]; errors: string[] };
 
 async function tryPapaparse(text: string): Promise<{ data: Record<string, unknown>[]; errors: ParseError[] } | null> {
   try {
-    // Dynamically import papaparse if available. If not installed, fall back.
     const Papa = await import("papaparse");
     return new Promise((resolve) => {
       Papa.parse(text, {
@@ -28,16 +28,22 @@ function buildRows(rawRows: Record<string, unknown>[]): { rows: PaymentRow[]; er
   const errors: string[] = [];
 
   rawRows.forEach((raw, idx) => {
-    // Normalize keys to lowercase for robust mapping (supports Name/name/etc)
     const lower: Record<string, unknown> = {};
     Object.keys(raw).forEach((k) => {
       lower[k.trim().toLowerCase()] = (raw as Record<string, unknown>)[k];
     });
 
+    const walletRaw = String((lower["wallet"] ?? "") as string).trim();
+    const walletChecksum = toChecksumAddress(walletRaw);
+    
+    if (walletRaw && !walletChecksum) {
+      errors.push(`Linha ${idx + 2}: endereço inválido "${walletRaw}"`);
+    }
+
     const row: PaymentRow = {
       id: crypto.randomUUID(),
       name: String((lower["name"] ?? "") as string).trim(),
-      wallet: String((lower["wallet"] ?? "") as string).trim(),
+      wallet: walletChecksum || walletRaw, 
       amount: String((lower["amount"] ?? "") as string).trim(),
     };
 
@@ -80,14 +86,12 @@ export async function parseCSVFile(file: File): Promise<ParseResult> {
       parsed = await parseWithXlsxFromArrayBuffer(buffer);
     } else if (name.endsWith(".csv")) {
       const text = await file.text();
-      // Prefer XLSX for consistency; fallback to Papa if needed
       try {
         parsed = await parseCsvWithXlsxFromText(text);
       } catch {
         parsed = (await tryPapaparse(text)) ?? { data: [] };
       }
     } else {
-      // Unknown extension: try XLSX first, then PapaParse, then naive
       try {
         const buffer = await file.arrayBuffer();
         parsed = await parseWithXlsxFromArrayBuffer(buffer);

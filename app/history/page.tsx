@@ -14,8 +14,9 @@ import {
   TrendingUp,
   Activity,
 } from "lucide-react";
+import AuthGuard from "@/components/AuthGuard";
 
-export default function HistoryPage() {
+function HistoryContent() {
   const items = useHistoryStore((s) => s.items);
 
   const stats = useMemo(() => {
@@ -53,7 +54,6 @@ export default function HistoryPage() {
 
   return (
     <div className="space-y-6 p-6">
-      {/* Header */}
       <div className="space-y-2">
         <h1 className="text-3xl font-bold tracking-tight">Histórico</h1>
         <p className="text-muted-foreground">
@@ -192,5 +192,13 @@ export default function HistoryPage() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+export default function HistoryPage() {
+  return (
+    <AuthGuard>
+      <HistoryContent />
+    </AuthGuard>
   );
 }

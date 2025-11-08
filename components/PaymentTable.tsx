@@ -1,5 +1,5 @@
 "use client";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { usePaymentsStore } from "../lib/store";
 import PaymentRow from "./PaymentRow";
 import { Card } from "@/components/ui/card";
@@ -14,15 +14,20 @@ import {
 const PAGE_SIZE = 10;
 
 export default function PaymentTable() {
-  const rows = usePaymentsStore((s) => s.rows);
+  const rows = usePaymentsStore((state) => state.rows);
   const [page, setPage] = useState(1);
+  const [localRows, setLocalRows] = useState(rows);
+
+  useEffect(() => {
+    setLocalRows([...rows]);
+  }, [rows]);
 
   const { pageRows, totalPages } = useMemo(() => {
     const start = (page - 1) * PAGE_SIZE;
-    const pageRows = rows.slice(start, start + PAGE_SIZE);
-    const totalPages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
+    const pageRows = localRows.slice(start, start + PAGE_SIZE);
+    const totalPages = Math.max(1, Math.ceil(localRows.length / PAGE_SIZE));
     return { pageRows, totalPages };
-  }, [rows, page]);
+  }, [localRows, page]);
 
   return (
     <Card className="overflow-hidden">
@@ -39,7 +44,7 @@ export default function PaymentTable() {
           {pageRows.map((r) => (
             <PaymentRow key={r.id} row={r} />
           ))}
-          {rows.length === 0 && (
+          {localRows.length === 0 && (
             <tr>
               <td colSpan={4} className="p-4 text-center text-muted-foreground">
                 Nenhum item. Importe um CSV ou cadastre manualmente.
@@ -62,7 +67,7 @@ export default function PaymentTable() {
               />
             </PaginationItem>
             <div className="text-xs text-muted-foreground">
-              Página {page} de {totalPages}
+              Página {page} de {totalPages} ({localRows.length} total)
             </div>
             <PaginationItem>
               <PaginationNext

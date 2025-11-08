@@ -8,6 +8,7 @@ import type {
 } from "../types/payments";
 
 export function estimateBatch(rows: PaymentRow[]): BatchEstimate {
+  
   const total = rows.reduce((acc, r) => {
     const n = parseFloat(String(r.amount ?? "0").replace(/[^0-9.-]/g, "")) || 0;
     return acc + n;
@@ -26,13 +27,7 @@ export async function executeBatchOnchain(
   rows: PaymentRow[],
   estimate?: BatchEstimate
 ): Promise<BatchExecuteResult> {
-  await new Promise((resolve) => setTimeout(resolve, 1000));
-  
-  return {
-    batchId: crypto.randomUUID(),
-    txHash: `0x${crypto.randomUUID().replace(/-/g, "").slice(0, 64)}`,
-    status: "pending",
-  };
+  throw new Error("executeBatchOnchain should be called from a component with wagmi hooks");
 }
 
 
