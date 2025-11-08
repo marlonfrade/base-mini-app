@@ -20,9 +20,9 @@ export const minikitConfig = {
   miniapp: {
     version: "1",
     name: "Onflow Chain",
-    subtitle: "Transparent treasury, automated batch payments",
+    subtitle: "Automated batch payments",
     description:
-      "Onflow Chain brings onchain transparency to your company’s finances through automated batch payments, secure treasury management, and scalable infrastructure designed for modern teams worldwide.",
+      "Onflow Chain brings onchain transparency to your company’s finances through automated batch payments.",
     screenshotUrls: [`${ROOT_URL}screenshot-portrait.png`],
     iconUrl: `${ROOT_URL}blue-icon.png`,
     splashImageUrl: `${ROOT_URL}blue-hero.png`,
